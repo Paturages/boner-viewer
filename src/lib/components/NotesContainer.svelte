@@ -100,9 +100,11 @@
   <!--
     Add lyrics at the bottom
   -->
-  {#each chart.lyrics as lyric}
-    <text class="lyric" x={getX(lyric.bar, noteSpacing)} y={930}>{lyric.text}</text>
-  {/each}
+  {#if chart.lyrics}
+    {#each chart.lyrics as lyric}
+      <text class="lyric" x={getX(lyric.bar, noteSpacing)} y={930}>{lyric.text}</text>
+    {/each}
+  {/if}
 </svg>
 
 <style>

@@ -57,7 +57,13 @@
             timesig: nrbf.data.timesig,
             endpoint: nrbf.data.endpoint,
             UNK1: 0,
-            notes: nrbf.data.savedleveldata._items.filter(x => x)
+            notes: nrbf.data.savedleveldata._items.filter(x => x),
+            lyrics: nrbf.data.lyricspos._items.map(
+              (arr, index) => arr ? ({
+                bar: arr[0],
+                text: nrbf.data.lyricstxt._items[index]
+              }) : null
+            ).filter(x => x)
           }
         }
 
