@@ -12,8 +12,12 @@ Don't question my naming sense, this is a WIP Trombone Champ chart previewer
 
 * Audio preview (trombone)
 * Audio preview (backing music)
+* Importing assets from remote URLs and handling hotlinks
+* Metadata editing, and .tmb re-export
+* Possibly handle MIDI parsing (there are other tools for that)
+* Lyrics preview
 * Change grid snap
-* Change zoom
+* Lyrics editing
 * Some other stuff I'll think about eventually
 
 ## Why?
@@ -22,4 +26,8 @@ I don't know man
 
 ## Notes
 
-This is probably the weirdest way to learn about writing SVGs by hand.
+* This is probably the weirdest way to learn about writing SVGs by hand
+* I could probably think about implementing color profiles and increase fidelity in regards to the actual game
+  and so on, but there are other better tools out there for that
+* I tried to experiment with embedding compressed chart data in the URL for quick hotlinking,
+  but it ended up way too big to be serviceable (>2000 characters)

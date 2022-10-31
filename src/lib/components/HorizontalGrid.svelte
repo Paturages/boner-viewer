@@ -4,7 +4,7 @@
 
   // The horizontal grid (beatlines) are embedded inside the note container SVG
   // since they have to scroll along
-  export let zoom: number = 150;
+  export let noteSpacing: number = 150;
   export let chart: Chart;
 
   interface Beatline {
@@ -38,17 +38,19 @@
 
 {#each getBeatlinesArray() as beatline}
   <line
-    x1={beatline.offset * zoom}
-    x2={beatline.offset * zoom}
+    x1={beatline.offset * noteSpacing}
+    x2={beatline.offset * noteSpacing}
     y1={0}
     y2={1000}
     stroke={beatline.color}
     stroke-width={beatline.width}
   />
   {#if beatline.measure}
-    <text class="measure" x={2 + beatline.offset * zoom} y={20}>{beatline.measure}</text>
-    <text class="offset" x={2 + beatline.offset * zoom} y={40}>{beatline.offset}</text>
-    <text class="timestamp" x={2 + beatline.offset * zoom} y={60}>{getLength(chart.tempo, beatline.offset, true)}</text>
+    <text class="measure" x={2 + beatline.offset * noteSpacing} y={20}>{beatline.measure}</text>
+  {/if}
+  {#if beatline.width >= 2}
+    <text class="offset" x={2 + beatline.offset * noteSpacing} y={40}>{beatline.offset}</text>
+    <text class="timestamp" x={2 + beatline.offset * noteSpacing} y={60}>{getLength(chart.tempo, beatline.offset, true)}</text>
   {/if}
 {/each}
 

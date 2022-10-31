@@ -8,12 +8,15 @@
   import NotesContainer from './lib/components/NotesContainer.svelte';
   import VerticalGrid from './lib/components/VerticalGrid.svelte';
   import Seeker from './lib/components/Seeker.svelte';
+  import Zoomer from './lib/components/Zoomer.svelte';
   import Metadata from './lib/components/Metadata.svelte';
 
   let loading = false;
   let isTryingToDragOver = false;
+  let hasError = false;
 
-  let zoom = 200;
+  let noteSpacing = 200;
+  let zoom = 100;
   let snap = 0.5;
   let offset = 0;
 
@@ -35,7 +38,11 @@
           chart = JSON.parse(String.fromCharCode(...view));
         } else {
           const nrbf: any = readNrbf(view);
-          if (nrbf.failed) throw new Error('Failed to parse NRBF');
+          if (nrbf.failed) {
+            hasError = true;
+            loading = false;
+            throw new Error('File is not a JSON, and NRBF parsing failed');
+          }
           chart = {
             author: 'Trombone Champ',
             name: file.name.split('.')[0],
@@ -56,19 +63,25 @@
 
         // Force some stuff to be the right type for cleaner logic
         chart.timesig = Number(chart.timesig);
+        // Adjust zoom according to note spacing
+        noteSpacing = chart.savednotespacing * (zoom / 100) * 2.4;
+        
         console.log(chart);
-
-        loading = false;
-        offset = -2;
+        offset = -1;
       }
       reader.readAsArrayBuffer(file);
+    } else {
+      hasError = true;
     }
+    loading = false;
   }
 
   const unload = () => {
     chart = null;
     audio = null;
     background = null;
+    hasError = false;
+    loading = false;
   }
 
   const onFileInput = $event => {
@@ -89,12 +102,12 @@
 
   const clampBackwards = () => {
     const unsnapSurplus = offset % snap;
-    offset = Math.max(-2, offset - (unsnapSurplus || snap));
+    offset = Math.max(-1, offset - (unsnapSurplus || snap));
   }
 
   const clampForwards = () => {
     const unsnapSurplus = offset % snap;
-    offset = Math.min(chart.endpoint - 2, offset + (unsnapSurplus ? (snap - unsnapSurplus) : snap));
+    offset = Math.min(chart.endpoint - 1, offset + (unsnapSurplus ? (snap - unsnapSurplus) : snap));
   }
 
   const onWheel = ($event: WheelEvent) => {
@@ -122,6 +135,10 @@
     offset = position;
   }
 
+  const onZoom = (zoomValue: number) => {
+    noteSpacing = chart.savednotespacing * (zoomValue / 100) * 2.4;
+  }
+
   onMount(() => window.addEventListener('keydown', onKeydown));
 </script>
 
@@ -136,12 +153,19 @@
   <div class="strikeline"></div>
   {#if chart}
     <Seeker offset={offset} chart={chart} onSeek={onSeek} />
-    <NotesContainer zoom={zoom} offset={offset} chart={chart} />
+    <NotesContainer noteSpacing={noteSpacing} offset={offset} chart={chart} />
     <Metadata chart={chart} />
+    <Zoomer bind:value={zoom} onChange={onZoom} />
     <button class="unload" title="Unload the chart" on:click={unload}>🗑️</button>
   {:else}
     <label class="instructions" for="file-input">
-      <p>Drag chart files here or click to upload</p>
+      {#if loading}
+        <p>Loading...</p>
+      {:else if hasError}
+        <p>Loading failed! Are you sure this is a valid .tmb file?</p>
+      {:else}
+        <p>Drag a .tmb file here or click to upload</p>
+      {/if}
       <input id="file-input" type="file" on:change={onFileInput} />
     </label>
   {/if}
