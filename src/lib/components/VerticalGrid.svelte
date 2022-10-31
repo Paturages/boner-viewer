@@ -34,6 +34,7 @@
     right: 0;
     top: 10%;
     bottom: 10%;
+    width: 90px;
     z-index: 10;
     display: flex;
     flex-direction: column;
