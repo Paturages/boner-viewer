@@ -31,7 +31,7 @@
       reader.onload = loadEvent => {
         const buffer = loadEvent.target.result as ArrayBuffer;
         const view = new Uint8Array(buffer);
-        if (String.fromCharCode(buffer[0]) == '{') {
+        if (String.fromCharCode(view[0]) == '{') {
           chart = JSON.parse(String.fromCharCode(...view));
         } else {
           const nrbf: any = readNrbf(view);
