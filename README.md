@@ -15,7 +15,6 @@ Don't question my naming sense, this is a WIP Trombone Champ chart previewer
 * Importing assets from remote URLs and handling hotlinks
 * Metadata editing, and .tmb re-export
 * Possibly handle MIDI parsing (there are other tools for that)
-* Lyrics preview
 * Change grid snap
 * Lyrics editing
 * Some other stuff I'll think about eventually

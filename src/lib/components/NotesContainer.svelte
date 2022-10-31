@@ -1,6 +1,8 @@
 <script lang="ts">
+  import * as Tone from 'tone';
   import type { Chart } from "../types";
   import HorizontalGrid from "./HorizontalGrid.svelte";
+  import { pitchToHertz } from '../utils/pitch';
 
   export let noteSpacing: number = 150;
   export let offset: number = 0;
@@ -18,6 +20,19 @@
     const curve1 = `s${getLength(length, noteSpacing) / 4},0 ${getLength(length, noteSpacing) / 2},${-pitchDelta * DELTA_MULT}`;
     const curve2 = `s${getLength(length, noteSpacing) / 2},${-pitchDelta * DELTA_MULT} ${getLength(length, noteSpacing) / 2},${-pitchDelta * DELTA_MULT}`
     return `${startingPoint} ${curve1} ${curve2}`;
+  }
+  const onNoteMousedown = (pitchStart: number, pitchEnd: number, length: number) => {
+    const seconds = length * 60 / chart.tempo;
+    const toot = new Tone.AMOscillator(pitchToHertz(pitchStart), "sawtooth8", "square4").toDestination();
+    toot.volume.value = -10;
+    toot.frequency.rampTo(pitchToHertz(pitchEnd), seconds/2, '+' + seconds/2)
+    const onNoteMouseup = () => {
+      toot.stop();
+      toot.dispose();
+      window.removeEventListener('mouseup', onNoteMouseup);
+    }
+    toot.start();
+    window.addEventListener('mouseup', onNoteMouseup);
   }
 </script>
 
@@ -87,6 +102,7 @@
   -->
   {#each chart.notes as [position, length, pitchStart, pitchDelta, pitchEnd], i}
     <path
+      on:mousedown={() => onNoteMousedown(pitchStart, pitchEnd, length)}
       fill="none"
       marker-start={chart.notes[i-1] && (chart.notes[i-1][0] + chart.notes[i-1][1] + ERROR_MARGIN) >= position ? 'url(#note-mid)' : 'url(#note-start)'}
       stroke="#5566aa"

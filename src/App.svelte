@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import * as Tone from 'tone';
   
   import type { Chart } from "./lib/types";
 
@@ -31,7 +32,10 @@
     // .tmb files: either JSON (custom songs) or NRBF (base game)
     // Try JSON first (most common)
     if (file.name.endsWith('.tmb')) {
-      reader.onload = loadEvent => {
+      reader.onload = async loadEvent => {
+        // Start toot engine
+        await Tone.start();
+
         const buffer = loadEvent.target.result as ArrayBuffer;
         const view = new Uint8Array(buffer);
         if (String.fromCharCode(view[0]) == '{') {
