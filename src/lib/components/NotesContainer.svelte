@@ -97,6 +97,12 @@
         `M${getX(position, noteSpacing)},${getY(pitchStart)} l${getLength(length, noteSpacing)},0`}
     />
   {/each}
+  <!--
+    Add lyrics at the bottom
+  -->
+  {#each chart.lyrics as lyric}
+    <text class="lyric" x={getX(lyric.bar, noteSpacing)} y={930}>{lyric.text}</text>
+  {/each}
 </svg>
 
 <style>
@@ -108,5 +114,9 @@
     left: 0;
     right: 0;
     bottom: 0;
+  }
+  .lyric {
+    fill: #fff;
+    font-size: 1.25em;
   }
 </style>

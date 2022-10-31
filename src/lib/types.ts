@@ -1,5 +1,10 @@
 export type Note = [position: number, length: number, pitchStart: number, pitchDelta: number, pitchEnd: number];
 
+export interface Lyric {
+  bar: number;
+  text: string;
+}
+
 export interface Chart {
   author: string;
   name: string;
@@ -15,4 +20,5 @@ export interface Chart {
   endpoint: number;
   UNK1: number;
   notes: Note[];
+  lyrics: Lyric[];
 }
