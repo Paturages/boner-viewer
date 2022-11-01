@@ -8,7 +8,7 @@
   let seekerElt: Element;
 
   const updateSeeker = (clientX: number) => {
-    if (clientX < 95) return onSeek(-2);
+    if (clientX < 95) return onSeek(-1);
     const progress = Math.min(1, (clientX - 95) / (seekerElt.clientWidth - 95));
     onSeek(progress * chart.endpoint);
   }

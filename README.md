@@ -6,7 +6,7 @@ Don't question my naming sense, this is a WIP Trombone Champ chart previewer
 
 * Loads and previews `.tmb` JSON files
 * Loads and previews base game `.tmb` chart files (NRBF)
-* No audio yet, just visual stuff
+* "Trombone" playback, ability to provide music playback
 
 ## TODO
 
