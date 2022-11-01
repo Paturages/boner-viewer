@@ -10,13 +10,13 @@ Don't question my naming sense, this is a WIP Trombone Champ chart previewer
 
 ## TODO
 
-* Audio preview (trombone)
 * Audio preview (backing music)
 * Importing assets from remote URLs and handling hotlinks
 * Metadata editing, and .tmb re-export
 * Possibly handle MIDI parsing (there are other tools for that)
 * Change grid snap
 * Lyrics editing
+* Try to make this somewhat usable on mobile (lol)
 * Some other stuff I'll think about eventually
 
 ## Why?

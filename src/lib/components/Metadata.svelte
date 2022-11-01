@@ -50,7 +50,7 @@
     text-align: right;
     position: absolute;
     bottom: 30px;
-    right: 50px;
+    right: 100px;
     padding: 5px;
     background: #444;
   }

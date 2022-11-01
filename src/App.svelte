@@ -4,6 +4,7 @@
   
   import type { Chart } from "./lib/types";
 
+  import { pitchToHertz, JOIN_ERROR_MARGIN } from "./lib/utils/pitch";
   import { readNrbf } from './lib/utils/nrbf';
 
   import NotesContainer from './lib/components/NotesContainer.svelte';
@@ -15,6 +16,7 @@
   let loading = false;
   let isTryingToDragOver = false;
   let hasError = false;
+  let isPlaying = false;
 
   let noteSpacing = 200;
   let zoom = 100;
@@ -24,6 +26,9 @@
   let chart: Chart = null;
   let audio = null;
   let background = null;
+  
+  const toot = new Tone.AMOscillator({ type: "sawtooth8", modulationType: "square4" }).toDestination();
+  toot.volume.value = -10;
 
   const loadFile = (file: File) => {
     loading = true;
@@ -73,8 +78,33 @@
 
         // Force some stuff to be the right type for cleaner logic
         chart.timesig = Number(chart.timesig);
+        chart.tempo = Number(chart.tempo);
         // Adjust zoom according to note spacing
         noteSpacing = chart.savednotespacing * (zoom / 100) * 2.4;
+
+        // Configure Tone.Transport for playback
+        Tone.Transport.cancel(0);
+        Tone.Transport.bpm.value = chart.tempo;
+        Tone.Transport.timeSignature = chart.timesig;
+        chart.notes.forEach(([position, length, pitchStart, pitchDelta, pitchEnd], index) => {
+          const previousNote = chart.notes[index - 1];
+          const nextNote = chart.notes[index + 1];
+          Tone.Transport.schedule(() => {
+            const lengthSeconds = length * 60 / chart.tempo;
+            toot.frequency.value = pitchToHertz(pitchStart);
+            if (pitchStart !== pitchEnd) {
+              toot.frequency.rampTo(pitchToHertz(pitchEnd), lengthSeconds / 2, `+${lengthSeconds / 2}`);
+            }
+            // Don't start the note if the previous note is joined to the current note
+            if (!previousNote || previousNote[0] + previousNote[1] + JOIN_ERROR_MARGIN < position) {
+              toot.start();
+            }
+            // Don't stop the note if the next note is joined to the current note
+            if (!nextNote || position + length + JOIN_ERROR_MARGIN < nextNote[0]) {
+              toot.stop(`+${lengthSeconds}`);
+            }
+          }, position * 60 / chart.tempo);
+        });
         
         console.log(chart);
         offset = -1;
@@ -137,6 +167,8 @@
       break;
       case 'ArrowLeft': clampBackwards();
       break;
+      case ' ': isPlaying ? pause() : play();
+      break;
     }
   }
 
@@ -147,6 +179,29 @@
 
   const onZoom = (zoomValue: number) => {
     noteSpacing = chart.savednotespacing * (zoomValue / 100) * 2.4;
+  }
+
+  // Playback loop reference: https://developer.mozilla.org/en-US/docs/Games/Anatomy
+  const playback = () => {
+    if (!chart || !isPlaying) return;
+    window.requestAnimationFrame(playback);
+    offset = Tone.Transport.seconds * chart.tempo / 60;
+    if (offset > chart.endpoint) pause();
+  }
+  
+  const play = () => {
+    if (!chart) return;
+    isPlaying = true;
+    Tone.Transport.seconds = offset * 60 / chart.tempo;
+    Tone.Transport.start();
+    playback();
+  }
+
+  const pause = () => {
+    if (!chart) return;
+    isPlaying = false;
+    toot.stop();
+    Tone.Transport.stop();
   }
 
   onMount(() => window.addEventListener('keydown', onKeydown));
@@ -166,6 +221,7 @@
     <NotesContainer noteSpacing={noteSpacing} offset={offset} chart={chart} />
     <Metadata chart={chart} />
     <Zoomer bind:value={zoom} onChange={onZoom} />
+    <button class="play-pause" title={isPlaying ? 'Pause' : 'Play'} on:click={isPlaying ? pause : play}>{isPlaying ? '⏸️' : '▶️'}</button>
     <button class="unload" title="Unload the chart" on:click={unload}>🗑️</button>
   {:else}
     <label class="instructions" for="file-input">
@@ -232,7 +288,7 @@
     align-items: center;
   }
 
-  .unload {
+  .unload, .play-pause {
     appearance: none;
     outline: none;
     border: 2px solid #fff3;
@@ -243,6 +299,10 @@
     height: 50px;
     width: 50px;
     font-size: 1.5em;
+  }
+  .play-pause {
+    bottom: 30px;
+    right: 50px;
   }
 
   .unload:hover {

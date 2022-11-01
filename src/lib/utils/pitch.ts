@@ -12,3 +12,5 @@ export const pitchToHertz = (pitch: number) => {
 
   return 440 * ratio;
 }
+
+export const JOIN_ERROR_MARGIN = 0.001;

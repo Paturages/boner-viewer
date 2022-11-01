@@ -2,15 +2,17 @@
   import * as Tone from 'tone';
   import type { Chart } from "../types";
   import HorizontalGrid from "./HorizontalGrid.svelte";
-  import { pitchToHertz } from '../utils/pitch';
+  import { pitchToHertz, JOIN_ERROR_MARGIN } from '../utils/pitch';
 
   export let noteSpacing: number = 150;
   export let offset: number = 0;
   export let chart: Chart;
+  
+  const toot = new Tone.AMOscillator({ type: "sawtooth8", modulationType: "square4" }).toDestination();
+  toot.volume.value = -10;
 
   const PITCH_MULT = 2.4;
   const DELTA_MULT = PITCH_MULT / 2;
-  const ERROR_MARGIN = 0.001;
 
   const getX = (position: number, noteSpacing: number) => position * noteSpacing;
   const getY = (pitch: number) => 500 - (pitch * PITCH_MULT);
@@ -23,12 +25,10 @@
   }
   const onNoteMousedown = (pitchStart: number, pitchEnd: number, length: number) => {
     const seconds = length * 60 / chart.tempo;
-    const toot = new Tone.AMOscillator(pitchToHertz(pitchStart), "sawtooth8", "square4").toDestination();
-    toot.volume.value = -10;
-    toot.frequency.rampTo(pitchToHertz(pitchEnd), seconds/2, '+' + seconds/2)
+    toot.frequency.value = pitchToHertz(pitchStart);
+    toot.frequency.rampTo(pitchToHertz(pitchEnd), seconds/2, '+' + seconds/2);
     const onNoteMouseup = () => {
       toot.stop();
-      toot.dispose();
       window.removeEventListener('mouseup', onNoteMouseup);
     }
     toot.start();
@@ -76,7 +76,7 @@
     Loop 1: Paint the backing white paths for the note outlines
   -->
   {#each chart.notes as [position, length, pitchStart, pitchDelta, pitchEnd], i}
-    {#if !chart.notes[i+1] || (position + length + ERROR_MARGIN) < chart.notes[i+1][0]}
+    {#if !chart.notes[i+1] || (position + length + JOIN_ERROR_MARGIN) < chart.notes[i+1][0]}
       <line
         x1={getX(position + length, noteSpacing) - 3}
         x2={getX(position + length, noteSpacing)}
@@ -104,7 +104,7 @@
     <path
       on:mousedown={() => onNoteMousedown(pitchStart, pitchEnd, length)}
       fill="none"
-      marker-start={chart.notes[i-1] && (chart.notes[i-1][0] + chart.notes[i-1][1] + ERROR_MARGIN) >= position ? 'url(#note-mid)' : 'url(#note-start)'}
+      marker-start={chart.notes[i-1] && (chart.notes[i-1][0] + chart.notes[i-1][1] + JOIN_ERROR_MARGIN) >= position ? 'url(#note-mid)' : 'url(#note-start)'}
       stroke="#5566aa"
       stroke-width={20}
       stroke-linecap="round"
