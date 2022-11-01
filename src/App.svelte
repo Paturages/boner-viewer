@@ -37,9 +37,7 @@
     // .tmb files: either JSON (custom songs) or NRBF (base game)
     // Try JSON first (most common)
     if (file.name.endsWith('.tmb')) {
-      reader.onload = async loadEvent => {
-        // Start toot engine
-        await Tone.start();
+      reader.onload = loadEvent => {
         toot.volume.value = Math.log(tootVolume / 100) * 10;
 
         const buffer = loadEvent.target.result as ArrayBuffer;
@@ -114,7 +112,7 @@
     } else {
       // Try to load audio file
       try {
-        reader.onload = async loadEvent => {
+        reader.onload = loadEvent => {
           const dataUrl = loadEvent.target.result as string;
           const newPlayer = new Tone.Player(dataUrl, () => {
             console.log('Audio loaded');
@@ -205,8 +203,10 @@
     if (offset > chart.endpoint) pause();
   }
   
-  const play = () => {
+  const play = async () => {
     if (!chart) return;
+    // Start toot engine
+    await Tone.start();
     isPlaying = true;
     const positionSeconds = offset * 60 / chart.tempo;
     if (player) {
