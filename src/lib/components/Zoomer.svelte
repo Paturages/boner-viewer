@@ -10,15 +10,12 @@
 
 <div class="zoomer">
   <div class="label">🔍</div>
-  <input type="range" bind:value on:change={handleChange} step={5} min={10} max={200} />
+  <input type="range" bind:value on:input={handleChange} step={5} min={10} max={200} />
   <div class="value">{value}%</div>
 </div>
 
 <style>
   .zoomer {
-    position: absolute;
-    bottom: 80px;
-    right: 0;
     padding: 5px;
     background: #444;
     display: flex;

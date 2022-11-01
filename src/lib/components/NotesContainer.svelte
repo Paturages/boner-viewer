@@ -26,7 +26,7 @@
   const onNoteMousedown = (pitchStart: number, pitchEnd: number, length: number) => {
     const seconds = length * 60 / chart.tempo;
     toot.frequency.value = pitchToHertz(pitchStart);
-    toot.frequency.rampTo(pitchToHertz(pitchEnd), seconds/2, '+' + seconds/2);
+    toot.frequency.rampTo(pitchToHertz(pitchEnd), seconds, '+' + seconds/2);
     const onNoteMouseup = () => {
       toot.stop();
       window.removeEventListener('mouseup', onNoteMouseup);

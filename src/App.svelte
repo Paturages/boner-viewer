@@ -11,6 +11,7 @@
   import VerticalGrid from './lib/components/VerticalGrid.svelte';
   import Seeker from './lib/components/Seeker.svelte';
   import Zoomer from './lib/components/Zoomer.svelte';
+  import Volume from './lib/components/Volume.svelte';
   import Metadata from './lib/components/Metadata.svelte';
 
   let loading = false;
@@ -22,13 +23,12 @@
   let zoom = 100;
   let snap = 0.5;
   let offset = 0;
+  let tootVolume = Number(localStorage.getItem('volume:toot') || 100);
+  let musicVolume = Number(localStorage.getItem('volume:music') || 100);
 
   let chart: Chart = null;
-  let audio = null;
-  let background = null;
-  
+  let player: Tone.Player = null;
   const toot = new Tone.AMOscillator({ type: "sawtooth8", modulationType: "square4" }).toDestination();
-  toot.volume.value = -10;
 
   const loadFile = (file: File) => {
     loading = true;
@@ -40,6 +40,7 @@
       reader.onload = async loadEvent => {
         // Start toot engine
         await Tone.start();
+        toot.volume.value = Math.log(tootVolume / 100) * 10;
 
         const buffer = loadEvent.target.result as ArrayBuffer;
         const view = new Uint8Array(buffer);
@@ -93,7 +94,7 @@
             const lengthSeconds = length * 60 / chart.tempo;
             toot.frequency.value = pitchToHertz(pitchStart);
             if (pitchStart !== pitchEnd) {
-              toot.frequency.rampTo(pitchToHertz(pitchEnd), lengthSeconds / 2, `+${lengthSeconds / 2}`);
+              toot.frequency.rampTo(pitchToHertz(pitchEnd), lengthSeconds);
             }
             // Don't start the note if the previous note is joined to the current note
             if (!previousNote || previousNote[0] + previousNote[1] + JOIN_ERROR_MARGIN < position) {
@@ -111,15 +112,30 @@
       }
       reader.readAsArrayBuffer(file);
     } else {
-      hasError = true;
+      // Try to load audio file
+      try {
+        reader.onload = async loadEvent => {
+          const dataUrl = loadEvent.target.result as string;
+          const newPlayer = new Tone.Player(dataUrl, () => {
+            console.log('Audio loaded');
+            player = newPlayer;
+            player.volume.value = Math.log(musicVolume / 100) * 10;
+          }).toDestination();
+          newPlayer.volume.value = -10;
+        };
+        reader.readAsDataURL(file);
+      } catch (err) {
+        console.error(err);
+        hasError = true;
+      }
     }
     loading = false;
   }
 
   const unload = () => {
+    if (player) player.dispose();
     chart = null;
-    audio = null;
-    background = null;
+    player = null;
     hasError = false;
     loading = false;
   }
@@ -192,7 +208,11 @@
   const play = () => {
     if (!chart) return;
     isPlaying = true;
-    Tone.Transport.seconds = offset * 60 / chart.tempo;
+    const positionSeconds = offset * 60 / chart.tempo;
+    if (player) {
+      player.start(positionSeconds < 0 ? `+${-positionSeconds}` : '+0', positionSeconds < 0 ? 0 : positionSeconds);
+    }
+    Tone.Transport.seconds = positionSeconds;
     Tone.Transport.start();
     playback();
   }
@@ -200,8 +220,21 @@
   const pause = () => {
     if (!chart) return;
     isPlaying = false;
+    if (player) player.stop();
     toot.stop();
     Tone.Transport.stop();
+  }
+
+  const onTootVolumeChange = (percent: number) => {
+    localStorage.setItem('volume:toot', String(percent));
+    tootVolume = percent;
+    toot.volume.value = Math.log(percent / 100) * 10;
+  }
+  
+  const onMusicVolumeChange = (percent: number) => {
+    localStorage.setItem('volume:music', String(percent));
+    musicVolume = percent;
+    if (player) player.volume.value = Math.log(percent / 100) * 10;
   }
 
   onMount(() => window.addEventListener('keydown', onKeydown));
@@ -219,10 +252,20 @@
   {#if chart}
     <Seeker offset={offset} chart={chart} onSeek={onSeek} />
     <NotesContainer noteSpacing={noteSpacing} offset={offset} chart={chart} />
-    <Metadata chart={chart} />
-    <Zoomer bind:value={zoom} onChange={onZoom} />
-    <button class="play-pause" title={isPlaying ? 'Pause' : 'Play'} on:click={isPlaying ? pause : play}>{isPlaying ? '⏸️' : '▶️'}</button>
-    <button class="unload" title="Unload the chart" on:click={unload}>🗑️</button>
+    <div class="toolbar-top">
+      <Zoomer bind:value={zoom} onChange={onZoom} />
+      <Volume bind:tootValue={tootVolume} bind:musicValue={musicVolume} onTootChange={onTootVolumeChange} onMusicChange={onMusicVolumeChange} />
+    </div>
+    <div class="toolbar-bottom">
+      <button class="play-pause" title={isPlaying ? 'Pause' : 'Play'} on:click={isPlaying ? pause : play}>{isPlaying ? '⏸️' : '▶️'}</button>
+      <label class="audio-info" for="audio-input">
+        {player ? 'Audio loaded' : 'No backing audio'}<br />
+        Click to upload
+        <input id="audio-input" type="file" on:change={onFileInput} />
+      </label>
+      <Metadata chart={chart} />
+      <button class="unload" title="Unload the chart" on:click={unload}>🗑️</button>
+    </div>
   {:else}
     <label class="instructions" for="file-input">
       {#if loading}
@@ -288,21 +331,44 @@
     align-items: center;
   }
 
+  .toolbar-top, .toolbar-bottom {
+    position: absolute;
+    bottom: 30px;
+    right: 0;
+    display: flex;
+  }
+  .toolbar-top {
+    bottom: 80px;
+  }
+
+  .audio-info {
+    position: relative;
+    background: #444;
+    border-left: 1px solid #fff3;
+    border-right: 1px solid #fff3;
+    padding: 2px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #audio-input {
+    position: absolute;
+    left: 0;
+    opacity: 0;
+    font-size: 0;
+    z-index: -1;
+  }
+
   .unload, .play-pause {
     appearance: none;
     outline: none;
     border: 2px solid #fff3;
     background: #444;
-    position: absolute;
-    bottom: 30px;
-    right: 0;
     height: 50px;
     width: 50px;
     font-size: 1.5em;
-  }
-  .play-pause {
-    bottom: 30px;
-    right: 50px;
   }
 
   .unload:hover {
