@@ -15,12 +15,12 @@
 </script>
 
 <div class="volume">
-  <div class="toot-volume">
+  <div class="toot-volume" title="Trombone volume">
     <div class="label">📯</div>
     <input type="range" bind:value={tootValue} on:input={handleTootChange} step={1} min={0} max={100} />
     <div class="value">{tootValue}%</div>
   </div>
-  <div class="music-volume">
+  <div class="music-volume" title="Music volume">
     <div class="label">🎵</div>
     <input type="range" bind:value={musicValue} on:input={handleMusicChange} step={1} min={0} max={100} />
     <div class="value">{musicValue}%</div>

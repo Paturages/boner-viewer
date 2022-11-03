@@ -8,14 +8,14 @@
   }
 </script>
 
-<div class="zoomer" title="Zoom level">
-  <div class="label">🔍</div>
-  <input type="range" bind:value on:input={handleChange} step={5} min={10} max={200} />
+<div class="playback-rate" title="Playback rate">
+  <div class="label">⏲️</div>
+  <input type="range" bind:value on:input={handleChange} step={5} min={25} max={200} />
   <div class="value">{value}%</div>
 </div>
 
 <style>
-  .zoomer {
+  .playback-rate {
     padding: 5px;
     background: #444;
     display: flex;

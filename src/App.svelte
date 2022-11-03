@@ -4,13 +4,14 @@
   
   import type { Chart } from "./lib/types";
 
-  import { pitchToHertz, JOIN_ERROR_MARGIN } from "./lib/utils/pitch";
+  import { pitchToHertz, positionToTicks, JOIN_ERROR_MARGIN } from "./lib/utils/pitch";
   import { readNrbf } from './lib/utils/nrbf';
 
   import NotesContainer from './lib/components/NotesContainer.svelte';
   import VerticalGrid from './lib/components/VerticalGrid.svelte';
   import Seeker from './lib/components/Seeker.svelte';
   import Zoomer from './lib/components/Zoomer.svelte';
+  import PlaybackRate from './lib/components/PlaybackRate.svelte';
   import Volume from './lib/components/Volume.svelte';
   import Metadata from './lib/components/Metadata.svelte';
 
@@ -20,6 +21,7 @@
   let isPlaying = false;
 
   let noteSpacing = 200;
+  let playbackRate = 100;
   let zoom = 100;
   let snap = 0.5;
   let offset = 0;
@@ -29,6 +31,7 @@
   let chart: Chart = null;
   let player: Tone.Player = null;
   const toot = new Tone.AMOscillator({ type: "sawtooth8", modulationType: "square4" }).toDestination();
+  const pitchShift = new Tone.PitchShift(0);
 
   const loadFile = (file: File) => {
     loading = true;
@@ -89,10 +92,10 @@
           const previousNote = chart.notes[index - 1];
           const nextNote = chart.notes[index + 1];
           Tone.Transport.schedule(() => {
-            const lengthSeconds = length * 60 / chart.tempo;
+            const lengthTicks = `${positionToTicks(length)}i`;
             toot.frequency.value = pitchToHertz(pitchStart);
             if (pitchStart !== pitchEnd) {
-              toot.frequency.rampTo(pitchToHertz(pitchEnd), lengthSeconds);
+              toot.frequency.rampTo(pitchToHertz(pitchEnd), lengthTicks);
             }
             // Don't start the note if the previous note is joined to the current note
             if (!previousNote || previousNote[0] + previousNote[1] + JOIN_ERROR_MARGIN < position) {
@@ -100,13 +103,15 @@
             }
             // Don't stop the note if the next note is joined to the current note
             if (!nextNote || position + length + JOIN_ERROR_MARGIN < nextNote[0]) {
-              toot.stop(`+${lengthSeconds}`);
+              toot.stop(`+${lengthTicks}`);
             }
-          }, position * 60 / chart.tempo);
+          }, Tone.TransportTime(positionToTicks(position), 'i'));
         });
         
         console.log(chart);
         offset = -1;
+        playbackRate = 100;
+        pitchShift.pitch = 0;
       }
       reader.readAsArrayBuffer(file);
     } else {
@@ -118,7 +123,7 @@
             console.log('Audio loaded');
             player = newPlayer;
             player.volume.value = Math.log(musicVolume / 100) * 10;
-          }).toDestination();
+          }).chain(pitchShift, Tone.Destination);
           newPlayer.volume.value = -10;
         };
         reader.readAsDataURL(file);
@@ -199,29 +204,40 @@
   const playback = () => {
     if (!chart || !isPlaying) return;
     window.requestAnimationFrame(playback);
-    offset = Tone.Transport.seconds * chart.tempo / 60;
+    offset = Tone.Transport.ticks / 192;
     if (offset > chart.endpoint) pause();
   }
   
+  // Sidenotes on player.sync():
+  // Syncing the player to the Tone.Transport will work at 100% speed nicely,
+  // but with different rates, the starting point needs to be recalculated accordingly
+  // because 1s in the player at a non-100% playback rate is not 1s anymore...
+  // and the duration also needs to be recalculated...
+  // (and you can't predict how long it's gonna play because rate can be changed during playback)
+  // Therefore, let's just not sync the player to the Tone.Transport, it's probably easier that way
   const play = async () => {
     if (!chart) return;
     // Start toot engine
     await Tone.start();
     isPlaying = true;
-    const positionSeconds = offset * 60 / chart.tempo;
+    const positionTicks = positionToTicks(offset);
+    Tone.Transport.ticks = positionTicks;
     if (player) {
-      player.start(positionSeconds < 0 ? `+${-positionSeconds}` : '+0', positionSeconds < 0 ? 0 : positionSeconds);
+      const startTime = positionTicks < 0 ? `+${-positionTicks}i` : '+0.1';
+      const offsetTime = positionTicks < 0 ? 0 : Tone.Transport.seconds * playbackRate / 100;
+      player.start(startTime, offsetTime);
     }
-    Tone.Transport.seconds = positionSeconds;
-    Tone.Transport.start();
+    // https://github.com/Tonejs/Tone.js/wiki/Performance#scheduling-in-advance
+    // Delay start by 0.1s to prevent some sync issues
+    Tone.Transport.start(positionTicks < 0 ? '+0' : '+0.1');
     playback();
   }
 
   const pause = () => {
     if (!chart) return;
     isPlaying = false;
-    if (player) player.stop();
     toot.stop();
+    player.stop();
     Tone.Transport.stop();
   }
 
@@ -235,6 +251,15 @@
     localStorage.setItem('volume:music', String(percent));
     musicVolume = percent;
     if (player) player.volume.value = Math.log(percent / 100) * 10;
+  }
+  
+  const onPlaybackRateChange = (percent: number) => {
+    if (player) player.playbackRate = percent / 100;
+    Tone.Transport.bpm.value = chart.tempo * (percent / 100);
+    // By default, 50% down-pitches by one octave, 200% up-pitches by one octave
+    // (hence the logarithmic scale, and one octave = 12 semi-tones)
+    // We want to repitch the player in order for toots to still make sense
+    pitchShift.pitch = -Math.log2(percent / 100) * 12;
   }
 
   onMount(() => window.addEventListener('keydown', onKeydown));
@@ -253,7 +278,10 @@
     <Seeker offset={offset} chart={chart} onSeek={onSeek} />
     <NotesContainer noteSpacing={noteSpacing} offset={offset} chart={chart} />
     <div class="toolbar-top">
-      <Zoomer bind:value={zoom} onChange={onZoom} />
+      <div class="toolbar-top-container">
+        <Zoomer bind:value={zoom} onChange={onZoom} />
+        <PlaybackRate bind:value={playbackRate} onChange={onPlaybackRateChange} />
+      </div>
       <Volume bind:tootValue={tootVolume} bind:musicValue={musicVolume} onTootChange={onTootVolumeChange} onMusicChange={onMusicVolumeChange} />
     </div>
     <div class="toolbar-bottom">
@@ -342,6 +370,7 @@
   }
 
   .audio-info {
+    user-select: none;
     position: relative;
     background: #444;
     border-left: 1px solid #fff3;

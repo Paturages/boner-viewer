@@ -13,4 +13,8 @@ export const pitchToHertz = (pitch: number) => {
   return 440 * ratio;
 }
 
+// By default, 192 ticks = 1 quarter note (4n)
+// Trombone Champ chart position/index unit is a quarter note
+export const positionToTicks = (position: number) => Math.floor(position * 192);
+
 export const JOIN_ERROR_MARGIN = 0.001;
