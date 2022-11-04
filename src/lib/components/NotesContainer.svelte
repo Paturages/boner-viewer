@@ -2,13 +2,13 @@
   import * as Tone from 'tone';
   import type { Chart } from "../types";
   import HorizontalGrid from "./HorizontalGrid.svelte";
-  import { pitchToHertz, JOIN_ERROR_MARGIN } from '../utils/pitch';
+  import { oscillatorSettings, pitchToHertz, JOIN_ERROR_MARGIN } from '../utils/pitch';
 
   export let noteSpacing: number = 150;
   export let offset: number = 0;
   export let chart: Chart;
   
-  const toot = new Tone.AMOscillator({ type: "sawtooth8", modulationType: "square4" }).toDestination();
+  const toot = new Tone.Oscillator(oscillatorSettings).toDestination();
   toot.volume.value = -10;
 
   const PITCH_MULT = 2.4;

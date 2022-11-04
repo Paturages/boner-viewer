@@ -4,7 +4,7 @@
   
   import type { Chart } from "./lib/types";
 
-  import { pitchToHertz, positionToTicks, JOIN_ERROR_MARGIN } from "./lib/utils/pitch";
+  import { oscillatorSettings, pitchToHertz, positionToTicks, JOIN_ERROR_MARGIN } from "./lib/utils/pitch";
   import { readNrbf } from './lib/utils/nrbf';
 
   import NotesContainer from './lib/components/NotesContainer.svelte';
@@ -30,7 +30,7 @@
 
   let chart: Chart = null;
   let player: Tone.Player = null;
-  const toot = new Tone.AMOscillator({ type: "sawtooth8", modulationType: "square4" }).toDestination();
+  const toot = new Tone.Oscillator(oscillatorSettings).toDestination();
   const pitchShift = new Tone.PitchShift(0);
 
   const loadFile = (file: File) => {
@@ -237,7 +237,7 @@
     if (!chart) return;
     isPlaying = false;
     toot.stop();
-    player.stop();
+    if (player) player.stop();
     Tone.Transport.stop();
   }
 

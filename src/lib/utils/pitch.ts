@@ -1,3 +1,20 @@
+// Playing around with https://tonejs.github.io/examples/oscillator
+// (expliciting typing to make typescript happy idk)
+export const oscillatorSettings: {
+  type: 'custom';
+  partials: number[];
+} = {
+  type: "custom",
+  partials: [
+    1, 1, 1, 1, 1, 0.8434636622299385, 0.25173912519290115, 0.19753086419753094,
+    0.08608519000771608, 0.019775390625, 0.030140817901234556,
+    0.030140817901234556, 0.012345679012345684, 0.012345679012345684,
+    0.007236810378086415, 0.007236810378086415, 0.007236810378086415,
+    0.00390625, 0.00390625, 0.00390625, 0.00390625, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0,
+  ],
+};
+
 // In Trombone Champ, pitch = 0 is C4 (center)
 // and one semitone = 13.75.
 // Since hertzes are logarithmic (A4 = 440, A3 = 220, A2 = 110...),
