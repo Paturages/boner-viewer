@@ -30,7 +30,19 @@
 
   let chart: Chart = null;
   let player: Tone.Player = null;
-  const toot = new Tone.Oscillator(oscillatorSettings).toDestination();
+
+  // https://github.com/Tonejs/Tone.js/wiki/Performance#contextlatencyhint
+  // We want low values to improve focus on sync and timing precision
+  // (at the expense of resources and a bit more scuffiness)
+  Tone.getContext().dispose();
+  const toneContext = new Tone.Context({
+    latencyHint : "interactive",
+    lookAhead: 0,
+    updateInterval: 0.01
+  });
+  Tone.setContext(toneContext);
+
+  const toot = new Tone.Oscillator(oscillatorSettings).chain(toneContext.destination);
   const pitchShift = new Tone.PitchShift(0);
 
   const loadFile = (file: File) => {
@@ -84,28 +96,29 @@
         // Adjust zoom according to note spacing
         noteSpacing = chart.savednotespacing * (zoom / 100) * 2.4;
 
-        // Configure Tone.Transport for playback
-        Tone.Transport.cancel(0);
-        Tone.Transport.bpm.value = chart.tempo;
-        Tone.Transport.timeSignature = chart.timesig;
+        // Configure transport for playback
+        toneContext.transport.cancel(0);
+        toneContext.transport.bpm.value = chart.tempo;
+        toneContext.transport.timeSignature = chart.timesig;
         chart.notes.forEach(([position, length, pitchStart, pitchDelta, pitchEnd], index) => {
           const previousNote = chart.notes[index - 1];
           const nextNote = chart.notes[index + 1];
-          Tone.Transport.schedule(() => {
-            const lengthTicks = `${positionToTicks(length)}i`;
+          toneContext.transport.schedule(() => {
+            const lengthTicks = positionToTicks(length);
             toot.frequency.value = pitchToHertz(pitchStart);
             if (pitchStart !== pitchEnd) {
-              toot.frequency.rampTo(pitchToHertz(pitchEnd), lengthTicks);
+              toot.frequency.rampTo(pitchToHertz(pitchEnd), lengthTicks + 'i');
             }
             // Don't start the note if the previous note is joined to the current note
             if (!previousNote || previousNote[0] + previousNote[1] + JOIN_ERROR_MARGIN < position) {
               toot.start();
             }
             // Don't stop the note if the next note is joined to the current note
+            // Also add a bit of length because lookAhead=0 seems to shorten notes a fair amount
             if (!nextNote || position + length + JOIN_ERROR_MARGIN < nextNote[0]) {
-              toot.stop(`+${lengthTicks}`);
+              toot.stop(`+${lengthTicks + 16}i`);
             }
-          }, Tone.TransportTime(positionToTicks(position), 'i'));
+          }, `${positionToTicks(position)}i`);
         });
         
         console.log(chart);
@@ -123,7 +136,7 @@
             console.log('Audio loaded');
             player = newPlayer;
             player.volume.value = Math.log(musicVolume / 100) * 10;
-          }).chain(pitchShift, Tone.Destination);
+          }).chain(pitchShift, toneContext.destination);
           newPlayer.volume.value = -10;
         };
         reader.readAsDataURL(file);
@@ -204,32 +217,31 @@
   const playback = () => {
     if (!chart || !isPlaying) return;
     window.requestAnimationFrame(playback);
-    offset = Tone.Transport.ticks / 192;
+    offset = toneContext.transport.ticks / 192;
     if (offset > chart.endpoint) pause();
   }
   
   // Sidenotes on player.sync():
-  // Syncing the player to the Tone.Transport will work at 100% speed nicely,
+  // Syncing the player to the transport will work at 100% speed nicely,
   // but with different rates, the starting point needs to be recalculated accordingly
   // because 1s in the player at a non-100% playback rate is not 1s anymore...
   // and the duration also needs to be recalculated...
   // (and you can't predict how long it's gonna play because rate can be changed during playback)
-  // Therefore, let's just not sync the player to the Tone.Transport, it's probably easier that way
+  // Therefore, let's just not sync the player to the transport, it's probably easier that way
   const play = async () => {
     if (!chart) return;
     // Start toot engine
     await Tone.start();
+    await toneContext.resume();
     isPlaying = true;
     const positionTicks = positionToTicks(offset);
-    Tone.Transport.ticks = positionTicks;
+    toneContext.transport.ticks = positionTicks;
     if (player) {
-      const startTime = positionTicks < 0 ? `+${-positionTicks}i` : '+0.1';
-      const offsetTime = positionTicks < 0 ? 0 : Tone.Transport.seconds * playbackRate / 100;
+      const startTime = positionTicks < 0 ? `+${-positionTicks}i` : '+0';
+      const offsetTime = positionTicks < 0 ? 0 : toneContext.transport.seconds * playbackRate / 100;
       player.start(startTime, offsetTime);
     }
-    // https://github.com/Tonejs/Tone.js/wiki/Performance#scheduling-in-advance
-    // Delay start by 0.1s to prevent some sync issues
-    Tone.Transport.start(positionTicks < 0 ? '+0' : '+0.1');
+    toneContext.transport.start('+0');
     playback();
   }
 
@@ -238,7 +250,7 @@
     isPlaying = false;
     toot.stop();
     if (player) player.stop();
-    Tone.Transport.stop();
+    toneContext.transport.stop();
   }
 
   const onTootVolumeChange = (percent: number) => {
@@ -255,7 +267,7 @@
   
   const onPlaybackRateChange = (percent: number) => {
     if (player) player.playbackRate = percent / 100;
-    Tone.Transport.bpm.value = chart.tempo * (percent / 100);
+    toneContext.transport.bpm.value = chart.tempo * (percent / 100);
     // By default, 50% down-pitches by one octave, 200% up-pitches by one octave
     // (hence the logarithmic scale, and one octave = 12 semi-tones)
     // We want to repitch the player in order for toots to still make sense
