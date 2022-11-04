@@ -34,4 +34,7 @@ export const pitchToHertz = (pitch: number) => {
 // Trombone Champ chart position/index unit is a quarter note
 export const positionToTicks = (position: number) => Math.floor(position * 192);
 
-export const JOIN_ERROR_MARGIN = 0.001;
+// This allows for some margin of error for slider joining,
+// but for the sake of strictness, this is disabled
+export const JOIN_ERROR_MARGIN = 0;
+// export const JOIN_ERROR_MARGIN = 0.001;

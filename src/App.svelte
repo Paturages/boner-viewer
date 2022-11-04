@@ -299,7 +299,7 @@
     <div class="toolbar-bottom">
       <button class="play-pause" title={isPlaying ? 'Pause' : 'Play'} on:click={isPlaying ? pause : play}>{isPlaying ? '⏸️' : '▶️'}</button>
       <label class="audio-info" for="audio-input">
-        {player ? 'Audio loaded' : 'No backing audio'}<br />
+        {player ? 'Music loaded' : 'No music'}<br />
         Click to upload
         <input id="audio-input" type="file" on:change={onFileInput} />
       </label>
