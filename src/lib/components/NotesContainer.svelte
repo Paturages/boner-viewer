@@ -1,8 +1,9 @@
 <script lang="ts">
   import * as Tone from 'tone';
   import type { Chart } from "../types";
-  import HorizontalGrid from "./HorizontalGrid.svelte";
   import { oscillatorSettings, pitchToHertz, JOIN_ERROR_MARGIN } from '../utils/pitch';
+  
+  import HorizontalGrid from "./HorizontalGrid.svelte";
 
   export let noteSpacing: number = 150;
   export let offset: number = 0;
@@ -113,9 +114,7 @@
         `M${getX(position, noteSpacing)},${getY(pitchStart)} l${getLength(length, noteSpacing)},0`}
     />
   {/each}
-  <!--
-    Add lyrics at the bottom
-  -->
+  <!-- Add lyrics at the bottom -->
   {#if chart.lyrics}
     {#each chart.lyrics as lyric}
       <text class="lyric" x={getX(lyric.bar, noteSpacing)} y={930}>{lyric.text}</text>
@@ -125,6 +124,7 @@
 
 <style>
   svg {
+    z-index: 1;
     user-select: none;
     height: 100%;
     position: absolute;

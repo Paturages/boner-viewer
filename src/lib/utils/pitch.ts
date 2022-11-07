@@ -35,6 +35,6 @@ export const pitchToHertz = (pitch: number) => {
 export const positionToTicks = (position: number) => Math.floor(position * 192);
 
 // This allows for some margin of error for slider joining,
-// but for the sake of strictness, this is disabled
-export const JOIN_ERROR_MARGIN = 0;
-// export const JOIN_ERROR_MARGIN = 0.001;
+// mainly because of JavaScript's funny float sum handling
+// (I hope no one's gonna be that anal about precision)
+export const JOIN_ERROR_MARGIN = 0.000001;

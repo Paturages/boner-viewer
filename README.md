@@ -14,7 +14,6 @@ Don't question my naming sense, this is a WIP Trombone Champ chart previewer
 
 * Metadata editing and .tmb re-export
 * Lyrics editing
-* Music waveform preview
 * Metronome
 * Change grid snap
 * Importing assets from remote URLs and handling hotlinks

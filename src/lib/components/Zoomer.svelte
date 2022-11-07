@@ -16,8 +16,7 @@
 
 <style>
   .zoomer {
-    padding: 5px;
-    background: #444;
+    padding: 5px 0;
     display: flex;
     align-items: center;
   }

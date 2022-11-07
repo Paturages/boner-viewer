@@ -8,10 +8,12 @@
   import { readNrbf } from './lib/utils/nrbf';
 
   import NotesContainer from './lib/components/NotesContainer.svelte';
+  import Waveform from './lib/components/Waveform.svelte';
   import VerticalGrid from './lib/components/VerticalGrid.svelte';
   import Seeker from './lib/components/Seeker.svelte';
   import Zoomer from './lib/components/Zoomer.svelte';
   import PlaybackRate from './lib/components/PlaybackRate.svelte';
+  import Audio from './lib/components/Audio.svelte';
   import Volume from './lib/components/Volume.svelte';
   import Metadata from './lib/components/Metadata.svelte';
 
@@ -19,6 +21,7 @@
   let isTryingToDragOver = false;
   let hasError = false;
   let isPlaying = false;
+  let enableWaveform = false;
 
   let noteSpacing = 200;
   let playbackRate = 100;
@@ -27,9 +30,12 @@
   let offset = 0;
   let tootVolume = Number(localStorage.getItem('volume:toot') || 100);
   let musicVolume = Number(localStorage.getItem('volume:music') || 100);
+  let audioLength: number = null;
+  let audioEndpoint: number = null;
 
   let chart: Chart = null;
   let player: Tone.Player = null;
+  let peakInfo: { index: number; value: number; }[] = null;
 
   // https://github.com/Tonejs/Tone.js/wiki/Performance#contextlatencyhint
   // We want low values to improve focus on sync and timing precision
@@ -116,7 +122,7 @@
             // Don't stop the note if the next note is joined to the current note
             // Also add a bit of length because lookAhead=0 seems to shorten notes a fair amount
             if (!nextNote || position + length + JOIN_ERROR_MARGIN < nextNote[0]) {
-              toot.stop(`+${lengthTicks + 16}i`);
+              toot.stop(`+${lengthTicks + 12}i`);
             }
           }, `${positionToTicks(position)}i`);
         });
@@ -125,6 +131,7 @@
         offset = -1;
         playbackRate = 100;
         pitchShift.pitch = 0;
+        loading = false;
       }
       reader.readAsArrayBuffer(file);
     } else {
@@ -136,6 +143,31 @@
             console.log('Audio loaded');
             player = newPlayer;
             player.volume.value = Math.log(musicVolume / 100) * 10;
+
+            // Build waveform data
+            const channelArrays = player.buffer.toArray();
+            const channel1 = typeof channelArrays[0] !== 'object' ? channelArrays as Float32Array : channelArrays[0];
+            const channel2 = typeof channelArrays[0] !== 'object' ? null : channelArrays[1];
+            audioLength = player.blockTime * channel1.length / 128;
+            audioEndpoint = audioLength * chart.tempo / 60;
+            // Build blocks calculating the average amplitude for each one
+            const BLOCK_SIZE = 128;
+            const newPeakInfo: typeof peakInfo = [];
+            let blockIndex = 0;
+            let totalAmplitude = 0;
+            for (let channelIndex = 0; channelIndex < channel1.length; ++channelIndex) {
+              totalAmplitude += channel1[channelIndex];
+              if (channel2) totalAmplitude += channel2[channelIndex];
+              if (blockIndex >= BLOCK_SIZE) {
+                newPeakInfo.push({ index: newPeakInfo.length, value: totalAmplitude / BLOCK_SIZE / (channel2 ? 2 : 1) });
+                totalAmplitude = 0;
+                blockIndex = 0;
+              } else {
+                ++blockIndex;
+              }
+            }
+            peakInfo = newPeakInfo;
+            loading = false;
           }).chain(pitchShift, toneContext.destination);
           newPlayer.volume.value = -10;
         };
@@ -143,9 +175,9 @@
       } catch (err) {
         console.error(err);
         hasError = true;
+        loading = false;
       }
     }
-    loading = false;
   }
 
   const unload = () => {
@@ -156,9 +188,10 @@
     loading = false;
   }
 
-  const onFileInput = $event => {
-    if (!$event.target.files || !$event.target.files.length) return;
-    for (const file of $event.target.files) {
+  const onFileInput = ($event: Event) => {
+    const target = $event.target as HTMLInputElement;
+    if (!target.files || !target.files.length) return;
+    for (const file of target.files) {
       loadFile(file);
     }
   }
@@ -288,8 +321,16 @@
   <div class="strikeline"></div>
   {#if chart}
     <Seeker offset={offset} chart={chart} onSeek={onSeek} />
+    {#if player && enableWaveform}
+      <Waveform noteSpacing={noteSpacing} offset={offset} peakInfo={peakInfo} audioEndpoint={audioEndpoint} />
+    {/if}
     <NotesContainer noteSpacing={noteSpacing} offset={offset} chart={chart} />
     <div class="toolbar-top">
+      {#if player}
+        <div class="toolbar-top-container">
+          <label><input type="checkbox" bind:checked={enableWaveform} /> Enable waveform</label>
+        </div>
+      {/if}
       <div class="toolbar-top-container">
         <Zoomer bind:value={zoom} onChange={onZoom} />
         <PlaybackRate bind:value={playbackRate} onChange={onPlaybackRateChange} />
@@ -298,11 +339,7 @@
     </div>
     <div class="toolbar-bottom">
       <button class="play-pause" title={isPlaying ? 'Pause' : 'Play'} on:click={isPlaying ? pause : play}>{isPlaying ? '⏸️' : '▶️'}</button>
-      <label class="audio-info" for="audio-input">
-        {player ? 'Music loaded' : 'No music'}<br />
-        Click to upload
-        <input id="audio-input" type="file" on:change={onFileInput} />
-      </label>
+      <Audio player={player} onFileInput={onFileInput} />
       <Metadata chart={chart} />
       <button class="unload" title="Unload the chart" on:click={unload}>🗑️</button>
     </div>
@@ -318,9 +355,27 @@
       <input id="file-input" type="file" on:change={onFileInput} />
     </label>
   {/if}
+  {#if loading}
+    <div class="loading-overlay">
+      Loading, please wait...
+    </div>
+  {/if}
 </main>
 
 <style>
+  .loading-overlay {
+    position: fixed;
+    top: 20%;
+    bottom: 20%;
+    left: 20%;
+    right: 20%;
+    background: #555;
+    border: 5px solid #aaa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   main {
     font-family: 'Courier New', Courier, monospace;
     position: fixed;
@@ -333,6 +388,7 @@
   }
 
   .strikeline {
+    z-index: 1;
     position: absolute;
     top: 0;
     bottom: 0;
@@ -372,6 +428,7 @@
   }
 
   .toolbar-top, .toolbar-bottom {
+    z-index: 2;
     position: absolute;
     bottom: 30px;
     right: 0;
@@ -380,26 +437,12 @@
   .toolbar-top {
     bottom: 80px;
   }
-
-  .audio-info {
-    user-select: none;
-    position: relative;
+  .toolbar-top-container {
+    padding: 0 5px;
     background: #444;
-    border-left: 1px solid #fff3;
-    border-right: 1px solid #fff3;
-    padding: 2px;
-    text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
-
-  #audio-input {
-    position: absolute;
-    left: 0;
-    opacity: 0;
-    font-size: 0;
-    z-index: -1;
+  .toolbar-top-container input {
+    margin: 10px 5px;
   }
 
   .unload, .play-pause {
@@ -412,7 +455,7 @@
     font-size: 1.5em;
   }
 
-  .unload:hover {
+  .unload:hover, .play-pause:hover {
     background: #666;
   }
 </style>
