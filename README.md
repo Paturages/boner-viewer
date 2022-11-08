@@ -6,14 +6,16 @@ Don't question my naming sense, this is a WIP Trombone Champ chart previewer
 
 * Loads and previews `.tmb` JSON files
 * Loads and previews base game `.tmb` chart files (NRBF)
-* "Trombone" playback, ability to provide music playback
+* "Trombone" playback, ability to provide music playback (supports `.ogg`, and likely many other things,
+  to the extent of browser support pretty much)
 * `savednotespacing` and tempo fidelity in regards to the game, (un)zooming ability
 * Playback rates from 25% to 200%
+* Audio waveform preview for sync checks
 
 ## TODO
 
-* Metadata editing and .tmb re-export
 * Lyrics editing
+* .tmb re-export
 * Metronome
 * Change grid snap
 * Importing assets from remote URLs and handling hotlinks

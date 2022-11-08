@@ -4,7 +4,7 @@
   
   import type { Chart } from "./lib/types";
 
-  import { oscillatorSettings, pitchToHertz, positionToTicks, JOIN_ERROR_MARGIN } from "./lib/utils/pitch";
+  import { oscillatorSettings, positionToTicks, scheduleToots } from "./lib/utils/tone";
   import { readNrbf } from './lib/utils/nrbf';
 
   import NotesContainer from './lib/components/NotesContainer.svelte';
@@ -96,37 +96,7 @@
           }
         }
 
-        // Force some stuff to be the right type for cleaner logic
-        chart.timesig = Number(chart.timesig);
-        chart.tempo = Number(chart.tempo);
-        // Adjust zoom according to note spacing
-        noteSpacing = chart.savednotespacing * (zoom / 100) * 2.4;
-
-        // Configure transport for playback
-        toneContext.transport.cancel(0);
-        toneContext.transport.bpm.value = chart.tempo;
-        toneContext.transport.timeSignature = chart.timesig;
-        chart.notes.forEach(([position, length, pitchStart, pitchDelta, pitchEnd], index) => {
-          const previousNote = chart.notes[index - 1];
-          const nextNote = chart.notes[index + 1];
-          toneContext.transport.schedule(() => {
-            const lengthTicks = positionToTicks(length);
-            toot.frequency.value = pitchToHertz(pitchStart);
-            if (pitchStart !== pitchEnd) {
-              toot.frequency.rampTo(pitchToHertz(pitchEnd), lengthTicks + 'i');
-            }
-            // Don't start the note if the previous note is joined to the current note
-            if (!previousNote || previousNote[0] + previousNote[1] + JOIN_ERROR_MARGIN < position) {
-              toot.start();
-            }
-            // Don't stop the note if the next note is joined to the current note
-            // Also add a bit of length because lookAhead=0 seems to shorten notes a fair amount
-            if (!nextNote || position + length + JOIN_ERROR_MARGIN < nextNote[0]) {
-              toot.stop(`+${lengthTicks + 12}i`);
-            }
-          }, `${positionToTicks(position)}i`);
-        });
-        
+        onMetadataChange(chart);
         console.log(chart);
         offset = -1;
         playbackRate = 100;
@@ -140,7 +110,6 @@
         reader.onload = loadEvent => {
           const dataUrl = loadEvent.target.result as string;
           const newPlayer = new Tone.Player(dataUrl, () => {
-            console.log('Audio loaded');
             player = newPlayer;
             player.volume.value = Math.log(musicVolume / 100) * 10;
 
@@ -307,6 +276,27 @@
     pitchShift.pitch = -Math.log2(percent / 100) * 12;
   }
 
+  const onMetadataChange = (newChart: Chart, property: string = 'all') => {
+    switch (property) {
+      // Force some stuff to be the right type for cleaner logic
+      case 'all':
+      case 'timesig': newChart.timesig = Number(newChart.timesig);
+      case 'all':
+      case 'tempo': {
+        newChart.tempo = Number(newChart.tempo);
+        if (audioLength) {
+          audioEndpoint = audioLength * chart.tempo / 60;
+        }
+        scheduleToots(toot, toneContext, newChart, playbackRate);
+      }
+      // Adjust zoom according to note spacing
+      case 'all':
+      case 'savednotespacing': noteSpacing = newChart.savednotespacing * (zoom / 100) * 2.4;
+    }
+    
+    chart = newChart;
+  }
+
   onMount(() => window.addEventListener('keydown', onKeydown));
 </script>
 
@@ -335,12 +325,17 @@
         <Zoomer bind:value={zoom} onChange={onZoom} />
         <PlaybackRate bind:value={playbackRate} onChange={onPlaybackRateChange} />
       </div>
-      <Volume bind:tootValue={tootVolume} bind:musicValue={musicVolume} onTootChange={onTootVolumeChange} onMusicChange={onMusicVolumeChange} />
+      <div class="toolbar-top-container">
+        <Volume bind:value={tootVolume} onChange={onTootVolumeChange} icon="📯" title="Trombone volume" />
+        {#if player}
+          <Volume bind:value={musicVolume} onChange={onMusicVolumeChange} icon="🎵" title="Music volume" />
+        {/if}
+      </div>
     </div>
     <div class="toolbar-bottom">
       <button class="play-pause" title={isPlaying ? 'Pause' : 'Play'} on:click={isPlaying ? pause : play}>{isPlaying ? '⏸️' : '▶️'}</button>
       <Audio player={player} onFileInput={onFileInput} />
-      <Metadata chart={chart} />
+      <Metadata chart={chart} audioLength={audioLength} audioEndpoint={audioEndpoint} onChange={onMetadataChange} />
       <button class="unload" title="Unload the chart" on:click={unload}>🗑️</button>
     </div>
   {:else}

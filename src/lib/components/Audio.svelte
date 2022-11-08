@@ -34,6 +34,7 @@
 
 <style>
   .audio-info {
+    min-width: 150px;
     cursor: pointer;
     user-select: none;
     position: relative;

@@ -14,7 +14,9 @@
     measure?: number;
   }
 
-  const getBeatlinesArray = () => {
+  let beatlinesArray: Beatline[] = [];
+
+  $: {
     const lines: Record<number, Beatline> = {};
     // 1. Generate quarter beats
     for (let i = 0; i <= chart.endpoint; i += 0.25) {
@@ -32,11 +34,11 @@
     for (let i = 0; i < chart.endpoint; i += chart.timesig) {
       lines[i] = { width: 3, color: '#fffa', offset: i, measure: 1 + (i / chart.timesig) };
     }
-    return Object.values(lines).sort((a, b) => a.offset - b.offset);
+    beatlinesArray = Object.values(lines).sort((a, b) => a.offset - b.offset);
   }
 </script>
 
-{#each getBeatlinesArray() as beatline}
+{#each beatlinesArray as beatline}
   <line
     x1={beatline.offset * noteSpacing}
     x2={beatline.offset * noteSpacing}

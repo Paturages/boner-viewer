@@ -1,7 +1,7 @@
 <script lang="ts">
   import * as Tone from 'tone';
   import type { Chart } from "../types";
-  import { oscillatorSettings, pitchToHertz, JOIN_ERROR_MARGIN } from '../utils/pitch';
+  import { oscillatorSettings, pitchToHertz, JOIN_ERROR_MARGIN } from '../utils/tone';
   
   import HorizontalGrid from "./HorizontalGrid.svelte";
 
