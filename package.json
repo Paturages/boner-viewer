@@ -15,7 +15,7 @@
     "svelte": "^3.52.0",
     "svelte-check": "^2.9.2",
     "svelte-preprocess": "^4.10.7",
-    "tone": "^14.7.77",
+    "tone": "^14.8.49",
     "tslib": "^2.4.0",
     "typescript": "^4.6.4",
     "utf8-codec": "^1.0.0",

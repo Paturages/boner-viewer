@@ -24,6 +24,21 @@ Don't question my naming sense, this is a WIP Trombone Champ chart previewer
 * Try to make this somewhat usable on mobile (lol)
 * Some other stuff I'll think about eventually
 
+## Development quickstart
+
+Install [Node.js](https://nodejs.org) (whichever recent version is fine)
+
+```sh
+# Install yarn (optional)
+npm install --global yarn
+
+# Install dependencies
+yarn (or npm install)
+
+# Run local dev server
+yarn dev (or npm run dev)
+```
+
 ## Why?
 
 I don't know man

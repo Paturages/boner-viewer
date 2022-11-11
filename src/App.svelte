@@ -48,7 +48,10 @@
   });
   Tone.setContext(toneContext);
 
-  const toot = new Tone.Oscillator(oscillatorSettings).chain(toneContext.destination);
+  const toot = new Tone.Oscillator({
+    ...oscillatorSettings,
+    context: toneContext,
+  }).chain(toneContext.destination);
   const pitchShift = new Tone.PitchShift(0);
 
   const loadFile = (file: File) => {
@@ -63,8 +66,12 @@
 
         const buffer = loadEvent.target.result as ArrayBuffer;
         const view = new Uint8Array(buffer);
+        let isDifferentChart: boolean;
         if (String.fromCharCode(view[0]) == '{') {
-          chart = JSON.parse(String.fromCharCode(...view));
+          const data = JSON.parse(String.fromCharCode(...view));
+          isDifferentChart = !chart || chart.trackRef !== data.trackRef;
+          if (isDifferentChart) unload();
+          chart = data;
         } else {
           const nrbf: any = readNrbf(view);
           if (nrbf.failed) {
@@ -72,6 +79,8 @@
             loading = false;
             throw new Error('File is not a JSON, and NRBF parsing failed');
           }
+          isDifferentChart = !chart || chart.trackRef !== file.name.split('.')[0];
+          if (isDifferentChart) unload();
           chart = {
             author: 'Trombone Champ',
             name: file.name.split('.')[0],
@@ -98,45 +107,52 @@
 
         onMetadataChange(chart);
         console.log(chart);
-        offset = -1;
-        playbackRate = 100;
-        pitchShift.pitch = 0;
+        if (isDifferentChart) {
+          offset = -1;
+          playbackRate = 100;
+          pitchShift.pitch = 0;
+        }
         loading = false;
       }
       reader.readAsArrayBuffer(file);
-    } else {
+    } else if (chart) {
       // Try to load audio file
       try {
         reader.onload = loadEvent => {
           const dataUrl = loadEvent.target.result as string;
-          const newPlayer = new Tone.Player(dataUrl, () => {
-            player = newPlayer;
-            player.volume.value = Math.log(musicVolume / 100) * 10;
+          const newPlayer = new Tone.Player({
+            context: toneContext,
+            url: dataUrl,
+            onload: () => {
+              if (player) player.dispose();
+              player = newPlayer;
+              player.volume.value = Math.log(musicVolume / 100) * 10;
 
-            // Build waveform data
-            const channelArrays = player.buffer.toArray();
-            const channel1 = typeof channelArrays[0] !== 'object' ? channelArrays as Float32Array : channelArrays[0];
-            const channel2 = typeof channelArrays[0] !== 'object' ? null : channelArrays[1];
-            audioLength = player.blockTime * channel1.length / 128;
-            audioEndpoint = audioLength * chart.tempo / 60;
-            // Build blocks calculating the average amplitude for each one
-            const BLOCK_SIZE = 128;
-            const newPeakInfo: typeof peakInfo = [];
-            let blockIndex = 0;
-            let totalAmplitude = 0;
-            for (let channelIndex = 0; channelIndex < channel1.length; ++channelIndex) {
-              totalAmplitude += channel1[channelIndex];
-              if (channel2) totalAmplitude += channel2[channelIndex];
-              if (blockIndex >= BLOCK_SIZE) {
-                newPeakInfo.push({ index: newPeakInfo.length, value: totalAmplitude / BLOCK_SIZE / (channel2 ? 2 : 1) });
-                totalAmplitude = 0;
-                blockIndex = 0;
-              } else {
-                ++blockIndex;
+              // Build waveform data
+              const channelArrays = player.buffer.toArray();
+              const channel1 = typeof channelArrays[0] !== 'object' ? channelArrays as Float32Array : channelArrays[0];
+              const channel2 = typeof channelArrays[0] !== 'object' ? null : channelArrays[1];
+              audioLength = player.blockTime * channel1.length / 128;
+              audioEndpoint = audioLength * chart.tempo / 60;
+              // Build blocks calculating the average amplitude for each one
+              const BLOCK_SIZE = 128;
+              const newPeakInfo: typeof peakInfo = [];
+              let blockIndex = 0;
+              let totalAmplitude = 0;
+              for (let channelIndex = 0; channelIndex < channel1.length; ++channelIndex) {
+                totalAmplitude += channel1[channelIndex];
+                if (channel2) totalAmplitude += channel2[channelIndex];
+                if (blockIndex >= BLOCK_SIZE) {
+                  newPeakInfo.push({ index: newPeakInfo.length, value: totalAmplitude / BLOCK_SIZE / (channel2 ? 2 : 1) });
+                  totalAmplitude = 0;
+                  blockIndex = 0;
+                } else {
+                  ++blockIndex;
+                }
               }
+              peakInfo = newPeakInfo;
+              loading = false;
             }
-            peakInfo = newPeakInfo;
-            loading = false;
           }).chain(pitchShift, toneContext.destination);
           newPlayer.volume.value = -10;
         };
@@ -243,7 +259,8 @@
       const offsetTime = positionTicks < 0 ? 0 : toneContext.transport.seconds * playbackRate / 100;
       player.start(startTime, offsetTime);
     }
-    toneContext.transport.start('+0');
+    // The lack of lookAhead seems to introduce a bit of delay between player and transport...
+    toneContext.transport.start('+0.02');
     playback();
   }
 
@@ -420,6 +437,11 @@
     flex-direction: column;
     justify-content: center;
     align-items: center;
+  }
+  
+  .instructions:hover {
+    cursor: pointer;
+    background: #fff1;
   }
 
   .toolbar-top, .toolbar-bottom {

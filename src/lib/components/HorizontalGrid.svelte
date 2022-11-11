@@ -32,7 +32,7 @@
     }
     // 4. Generate measures
     for (let i = 0; i < chart.endpoint; i += chart.timesig) {
-      lines[i] = { width: 3, color: '#fffa', offset: i, measure: 1 + (i / chart.timesig) };
+      lines[i] = { width: 3, color: '#fffa', offset: i, measure: (i / chart.timesig) };
     }
     beatlinesArray = Object.values(lines).sort((a, b) => a.offset - b.offset);
   }
@@ -47,7 +47,7 @@
     stroke={beatline.color}
     stroke-width={beatline.width}
   />
-  {#if beatline.measure}
+  {#if beatline.measure !== undefined}
     <text class="measure" x={2 + beatline.offset * noteSpacing} y={20}>{beatline.measure}</text>
   {/if}
   {#if beatline.width >= 2}

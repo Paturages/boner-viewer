@@ -51,23 +51,29 @@ export const scheduleToots = (toot: Oscillator, toneContext: Context, chart: Cha
     ([position, length, pitchStart, pitchDelta, pitchEnd], index) => {
       const previousNote = chart.notes[index - 1];
       const nextNote = chart.notes[index + 1];
-      toneContext.transport.schedule(() => {
-        const lengthTicks = positionToTicks(length);
+      toneContext.transport.schedule(scheduledTime => {
+        const lengthTicks = `${positionToTicks(length)}i`;
+        const lengthSeconds = toneContext.transport.toSeconds(lengthTicks);
         toot.frequency.value = pitchToHertz(pitchStart);
         if (pitchStart !== pitchEnd) {
-          toot.frequency.rampTo(pitchToHertz(pitchEnd), lengthTicks + "i");
+          toot.frequency.rampTo(
+            pitchToHertz(pitchEnd),
+            lengthTicks,
+            // Something something lack of lookAhead
+            scheduledTime + 0.03
+          );
         }
         // Don't start the note if the previous note is joined to the current note
         if (
           !previousNote ||
           previousNote[0] + previousNote[1] + JOIN_ERROR_MARGIN < position
         ) {
-          toot.start();
+          toot.start(scheduledTime);
         }
         // Don't stop the note if the next note is joined to the current note
         // Also add a bit of length because lookAhead=0 seems to shorten notes a fair amount
         if (!nextNote || position + length + JOIN_ERROR_MARGIN < nextNote[0]) {
-          toot.stop(`+${lengthTicks + 12}i`);
+          toot.stop(scheduledTime + lengthSeconds + 0.03);
         }
       }, `${positionToTicks(position)}i`);
     }
