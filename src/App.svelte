@@ -353,7 +353,7 @@
     -->
     <NotesContainer
       noteSpacing={noteSpacing}
-      offset={offset}
+      bind:offset={offset}
       snap={denominatorToSnap(denominator)}
       chart={chart}
       enableLyricsEditor={enableLyricsEditor && !isPlaying}

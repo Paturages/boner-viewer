@@ -44,6 +44,7 @@
     window.addEventListener('mouseup', onNoteMouseup);
   }
   const onLyricClick = ($event: MouseEvent, offset: number) => {
+    if (!enableLyricsEditor) return;
     // Spawn a text input for the lyric at its current position
     // Having the input scroll away on navigation would be weird,
     // so it's fine having it positioned outside of the SVG, with
@@ -58,12 +59,34 @@
     });
   }
   const onLyricAuxClick = ($event: MouseEvent, lyricToDelete: Lyric) => {
+    if (!enableLyricsEditor) return;
     if ($event.button === 1) {
       onChartChange({ ...chart, lyrics: chart.lyrics.filter(lyric => lyric !== lyricToDelete) }, 'lyrics');
     }
   }
-  const onLyricChange = () => {
-    if (!lyricElement.value) return;
+  const detectShortcuts = ($event: KeyboardEvent) => {
+    if ($event.key === 'Escape') {
+      // Cancel edit
+      selectedLyric = null;
+    } else if ($event.key === 'Tab') {
+      // Go to next lyric or previous lyric (if shift is held)
+      const newLyric = $event.shiftKey
+        ? [...chart.lyrics].reverse().find(lyric => lyric.bar < selectedLyric.bar)
+        : chart.lyrics.find(lyric => lyric.bar > selectedLyric.bar);
+      if (newLyric) {
+        // Prevent the input from being blurred
+        $event.preventDefault();
+        offset += newLyric.bar - selectedLyric.bar;
+        selectedLyric = newLyric;
+      }
+    }
+  }
+  const onLyricChange = ($event: Event) => {
+    $event.preventDefault();
+    if (!lyricElement.value) {
+      selectedLyric = null;
+      return;
+    }
     const newLyrics = [];
     let isLyricInserted = false;
     chart.lyrics.forEach(lyric => {
@@ -97,6 +120,7 @@
       value={selectedLyric.text}
       on:blur={onLyricChange}
       on:input={stopPropagation}
+      on:keydown={detectShortcuts}
     />
   </form>
 {/if}
