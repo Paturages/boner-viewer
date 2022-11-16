@@ -65,6 +65,8 @@
     }
   }
   const detectShortcuts = ($event: KeyboardEvent) => {
+    // Do not propagate to the global context
+    $event.stopPropagation();
     if ($event.key === 'Escape') {
       // Cancel edit
       selectedLyric = null;
@@ -74,17 +76,23 @@
         ? [...chart.lyrics].reverse().find(lyric => lyric.bar < selectedLyric.bar)
         : chart.lyrics.find(lyric => lyric.bar > selectedLyric.bar);
       if (newLyric) {
-        // Prevent the input from being blurred
-        $event.preventDefault();
         offset += newLyric.bar - selectedLyric.bar;
-        selectedLyric = newLyric;
+        // Force a lyric change event here with the keyboard event:
+        // the default (blurring the input) will be prevented and
+        // the input should still remain, allowing the new selected
+        // lyric to take over the value.
+        onLyricChange($event, newLyric);
+        setTimeout(() => {
+          lyricElement.focus();
+          lyricElement.select();
+        });
       }
     }
   }
-  const onLyricChange = ($event: Event) => {
+  const onLyricChange = ($event: Event, newSelectedLyric: Lyric = null) => {
     $event.preventDefault();
     if (!lyricElement.value) {
-      selectedLyric = null;
+      selectedLyric = newSelectedLyric;
       return;
     }
     const newLyrics = [];
@@ -104,7 +112,7 @@
     if (!isLyricInserted) {
       newLyrics.push({ ...selectedLyric, text: lyricElement.value });
     }
-    selectedLyric = null;
+    selectedLyric = newSelectedLyric;
     onChartChange({ ...chart, lyrics: newLyrics }, 'lyrics');
   }
   const stopPropagation = ($event: Event) => $event.stopPropagation();
