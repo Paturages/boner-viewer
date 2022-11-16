@@ -20,6 +20,9 @@
     showDetails = !showDetails;
   }
 
+  // Don't propagate keys or scroll to the global editor controls
+  const stopPropagation = ($event: Event) => $event.stopPropagation();
+
   $: {
     if (chart) {
       if (!difficulty) ({ difficulty } = chart);
@@ -39,49 +42,49 @@
       <li>
         <div class="metadata-label">author</div>
         <div class="metadata-value">
-          <input type="text" data-property="author" value={chart.author} on:change={handleChange} />
+          <input type="text" data-property="author" value={chart.author} on:change={handleChange} on:keydown={stopPropagation} />
         </div>
       </li>
       <li>
         <div class="metadata-label">name</div>
         <div class="metadata-value">
-          <input type="text" data-property="name" value={chart.name} on:change={handleChange} />
+          <input type="text" data-property="name" value={chart.name} on:change={handleChange} on:keydown={stopPropagation} />
         </div>
       </li>
       <li>
         <div class="metadata-label">description</div>
         <div class="metadata-value">
-          <textarea data-property="description" value={chart.description} on:change={handleChange} />
+          <textarea data-property="description" value={chart.description} on:change={handleChange} on:keydown={stopPropagation} />
         </div>
       </li>
       <li>
         <div class="metadata-label">shortName</div>
         <div class="metadata-value">
-          <input type="text" data-property="shortName" value={chart.shortName} on:change={handleChange} />
+          <input type="text" data-property="shortName" value={chart.shortName} on:change={handleChange} on:keydown={stopPropagation} />
         </div>
       </li>
       <li>
         <div class="metadata-label">genre</div>
         <div class="metadata-value">
-          <input type="text" data-property="genre" value={chart.genre} on:change={handleChange} />
+          <input type="text" data-property="genre" value={chart.genre} on:change={handleChange} on:keydown={stopPropagation} />
         </div>
       </li>
       <li>
         <div class="metadata-label">trackRef</div>
         <div class="metadata-value">
-          <input type="text" data-property="trackRef" value={chart.trackRef} on:change={handleChange} />
+          <input type="text" data-property="trackRef" value={chart.trackRef} on:change={handleChange} on:keydown={stopPropagation} />
         </div>
       </li>
       <li>
         <div class="metadata-label">year</div>
         <div class="metadata-value">
-          <input type="text" data-property="year" value={chart.year} on:change={handleChange} />
+          <input type="text" data-property="year" value={chart.year} on:change={handleChange} on:keydown={stopPropagation} />
         </div>
       </li>
       <li>
         <div class="metadata-label">difficulty</div>
         <div class="metadata-value">
-          <input type="range" data-property="difficulty" bind:value={difficulty} on:change={handleChange} min={1} max={10} step={1} /> {difficulty}
+          <input type="range" data-property="difficulty" bind:value={difficulty} on:change={handleChange} on:keydown={stopPropagation} min={1} max={10} step={1} /> {difficulty}
         </div>
       </li>
       <li>
@@ -92,6 +95,7 @@
             data-property="savednotespacing"
             bind:value={savednotespacing}
             on:change={handleChange}
+            on:keydown={stopPropagation}
             min={10}
             max={1000}
             step={5}
@@ -101,37 +105,38 @@
       <li>
         <div class="metadata-label">tempo</div>
         <div class="metadata-value">
-          <input type="number" data-property="tempo" value={chart.tempo} min={1} on:change={handleChange} />
+          <input type="number" data-property="tempo" value={chart.tempo} min={1} on:change={handleChange} on:keydown={stopPropagation} />
         </div>
       </li>
       <li>
         <div class="metadata-label">timesig</div>
         <div class="metadata-value">
-          <input type="number" data-property="timesig" value={chart.timesig} min={1} on:change={handleChange} /> / 4
+          <input type="number" data-property="timesig" value={chart.timesig} min={1} on:change={handleChange} on:keydown={stopPropagation} /> / 4
         </div>
       </li>
       <li>
         <div class="metadata-label">endpoint</div>
-        <div class="metadata-value">
+        <div class="metadata-value endpoint">
           {#if audioEndpoint}
             <input
               type="range"
               data-property="endpoint"
               bind:value={endpoint}
               on:change={handleChange}
+              on:keydown={stopPropagation}
               min={0}
               max={audioEndpoint}
               step={1}
-            /> {getLength(chart.tempo, endpoint)}/{toHumanTime(audioLength)}
+            /> {getLength(chart.tempo, endpoint)}/{toHumanTime(audioLength)} ({endpoint})
           {:else}
-            <input type="number" data-property="endpoint" value={chart.endpoint} on:change={handleChange} />
+            <input type="number" data-property="endpoint" value={chart.endpoint} on:change={handleChange} on:keydown={stopPropagation} />
           {/if}
         </div>
       </li>
       <li>
         <div class="metadata-label">UNK1</div>
         <div class="metadata-value">
-          <input type="number" data-property="UNK1" value={chart.UNK1} on:change={handleChange} />
+          <input type="number" data-property="UNK1" value={chart.UNK1} on:change={handleChange} on:keydown={stopPropagation} />
         </div>
       </li>
       <li><br /><a href="javascript:void(0)" on:click={toggleDetails}>Hide details</a></li>
@@ -139,7 +144,11 @@
   </div>
 {/if}
 <div class="metadata">
-  <div class="title">{chart.author} - {chart.name}</div>
+  {#if chart.author.length + chart.name.length > 50}
+    <div class="title ellipsis" title={chart.author + ' - ' + chart.name}>{chart.name}</div>
+  {:else}
+    <div class="title">{chart.author} - {chart.name}</div>
+  {/if}
   <div class="tempo">♩ = {chart.tempo} | {chart.timesig}/4 | {getLength(chart.tempo, chart.endpoint)} | <a href="javascript:void(0)" on:click={toggleDetails}>See more</a></div>
 </div>
 
@@ -150,10 +159,17 @@
     background: #444;
   }
 
+  .ellipsis {
+    max-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .metadata-details {
     z-index: 10;
-    position: absolute;
-    bottom: 118px;
+    position: fixed;
+    bottom: 80px;
     right: 0;
     width: 500px;
     padding-right: 20px;
@@ -184,6 +200,9 @@
   }
   .metadata-value > input[data-property="timesig"] {
     width: 60px;
+  }
+  .metadata-value > input[data-property="endpoint"] {
+    width: calc(100% - 180px);
   }
 
   input, textarea {

@@ -1,13 +1,14 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import * as Tone from 'tone';
   
   import type { Chart } from "./lib/types";
 
   import { oscillatorSettings, positionToTicks, scheduleToots } from "./lib/utils/tone";
+  import { denominatorToSnap, snapPositionBackwards, snapPositionForwards } from "./lib/utils/rhythm";
   import { readNrbf } from './lib/utils/nrbf';
 
   import NotesContainer from './lib/components/NotesContainer.svelte';
+  import LyricsTextarea from './lib/components/LyricsTextarea.svelte';
   import Waveform from './lib/components/Waveform.svelte';
   import VerticalGrid from './lib/components/VerticalGrid.svelte';
   import Seeker from './lib/components/Seeker.svelte';
@@ -16,17 +17,22 @@
   import Audio from './lib/components/Audio.svelte';
   import Volume from './lib/components/Volume.svelte';
   import Metadata from './lib/components/Metadata.svelte';
+  import { download } from './lib/utils/misc';
+
+  // Most common denominators: granular ones can be either manually input or Ctrl+arrowed
+  const denominators = [1, 2, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128];
 
   let loading = false;
   let isTryingToDragOver = false;
   let hasError = false;
   let isPlaying = false;
   let enableWaveform = false;
+  let enableLyricsEditor = false;
 
   let noteSpacing = 200;
   let playbackRate = 100;
   let zoom = 100;
-  let snap = 0.5;
+  let denominator = 8;
   let offset = 0;
   let tootVolume = Number(localStorage.getItem('volume:toot') || 100);
   let musicVolume = Number(localStorage.getItem('volume:music') || 100);
@@ -105,7 +111,7 @@
           }
         }
 
-        onMetadataChange(chart);
+        onChartDataChange(chart);
         console.log(chart);
         if (isDifferentChart) {
           offset = -1;
@@ -191,17 +197,16 @@
   }
 
   const clampBackwards = () => {
-    const unsnapSurplus = offset % snap;
-    offset = Math.max(-1, offset - (unsnapSurplus || snap));
+    const snap = denominatorToSnap(denominator);
+    offset = Math.max(-1, snapPositionBackwards(offset, snap));
   }
 
   const clampForwards = () => {
-    const unsnapSurplus = offset % snap;
-    offset = Math.min(chart.endpoint - 1, offset + (unsnapSurplus ? (snap - unsnapSurplus) : snap));
+    const snap = denominatorToSnap(denominator);
+    offset = Math.min(chart.endpoint - 1, snapPositionForwards(offset, snap));
   }
 
   const onWheel = ($event: WheelEvent) => {
-    $event.preventDefault();
     if (!chart) return;
     // Positive = downwards
     if ($event.deltaY > 0) {
@@ -213,6 +218,10 @@
 
   const onKeydown = ($event: KeyboardEvent) => {
     switch ($event.key) {
+      case 'ArrowUp': denominator = $event.ctrlKey ? denominator + 1 : denominators.find(d => d > denominator) || denominator;
+      break;
+      case 'ArrowDown': denominator = $event.ctrlKey ? denominator - 1 : [...denominators].reverse().find(d => d < denominator) || denominator;
+      break;
       case 'ArrowRight': clampForwards();
       break;
       case 'ArrowLeft': clampBackwards();
@@ -293,7 +302,7 @@
     pitchShift.pitch = -Math.log2(percent / 100) * 12;
   }
 
-  const onMetadataChange = (newChart: Chart, property: string = 'all') => {
+  const onChartDataChange = (newChart: Chart, property: string = 'all') => {
     switch (property) {
       // Force some stuff to be the right type for cleaner logic
       case 'all':
@@ -314,13 +323,19 @@
     chart = newChart;
   }
 
-  onMount(() => window.addEventListener('keydown', onKeydown));
+  const onDownload = () => download('song.tmb', JSON.stringify(chart));
 </script>
 
-<main on:dragover={$event => {
-  $event.preventDefault();
-  isTryingToDragOver = true;
-}} on:drop={onFileDrop} on:wheel={onWheel}>
+<svelte:window on:keydown={onKeydown} />
+<svelte:body
+  on:dragover={$event => {
+    $event.preventDefault();
+    isTryingToDragOver = true;
+  }}
+  on:drop={onFileDrop}
+  on:wheel={onWheel}
+/>
+<main class:lyrics-editor-enabled={enableLyricsEditor}>
   {#if isTryingToDragOver}
     <div class="dragover-overlay"></div>
   {/if}
@@ -331,18 +346,50 @@
     {#if player && enableWaveform}
       <Waveform noteSpacing={noteSpacing} offset={offset} peakInfo={peakInfo} audioEndpoint={audioEndpoint} />
     {/if}
-    <NotesContainer noteSpacing={noteSpacing} offset={offset} chart={chart} />
+    <!--
+      The editor features within the notes container should not be enabled
+      when the chart is playing because it is disruptive in both a visual
+      and a performance sense
+    -->
+    <NotesContainer
+      noteSpacing={noteSpacing}
+      offset={offset}
+      snap={denominatorToSnap(denominator)}
+      chart={chart}
+      enableLyricsEditor={enableLyricsEditor && !isPlaying}
+      onChartChange={onChartDataChange}
+    />
     <div class="toolbar-top">
-      {#if player}
-        <div class="toolbar-top-container">
+      <div class="toolbar-container">
+        <label
+          style="cursor: help"
+          title="Double click to place a lyric event
+Click an existing event to edit it
+Middle click to delete an event
+You can edit the lyrics textarea to edit events:
+the lyrics will be spread according to | separators"
+        ><input type="checkbox" bind:checked={enableLyricsEditor} /> Enable lyrics editor</label>
+        {#if player}
+          <br />
           <label><input type="checkbox" bind:checked={enableWaveform} /> Enable waveform</label>
-        </div>
-      {/if}
-      <div class="toolbar-top-container">
+        {/if}
+      </div>
+      <div
+        class="toolbar-container grid-snap"
+        title="You can use arrow up/down to cycle through common snaps
+Hold Ctrl to go through granular units,
+or just edit the input value directly"
+      >
+        <div>Temporal grid snap</div>
+        <div>1 / <input type="number" bind:value={denominator} min={1} /></div>
+      </div>
+    </div>
+    <div class="toolbar-middle">
+      <div class="toolbar-container">
         <Zoomer bind:value={zoom} onChange={onZoom} />
         <PlaybackRate bind:value={playbackRate} onChange={onPlaybackRateChange} />
       </div>
-      <div class="toolbar-top-container">
+      <div class="toolbar-container">
         <Volume bind:value={tootVolume} onChange={onTootVolumeChange} icon="📯" title="Trombone volume" />
         {#if player}
           <Volume bind:value={musicVolume} onChange={onMusicVolumeChange} icon="🎵" title="Music volume" />
@@ -350,11 +397,15 @@
       </div>
     </div>
     <div class="toolbar-bottom">
-      <button class="play-pause" title={isPlaying ? 'Pause' : 'Play'} on:click={isPlaying ? pause : play}>{isPlaying ? '⏸️' : '▶️'}</button>
+      <button class="toolbar-button" title="Save chart" on:click={onDownload}>💾</button>
+      <button class="toolbar-button" title={isPlaying ? 'Pause' : 'Play'} on:click={isPlaying ? pause : play}>{isPlaying ? '⏸️' : '▶️'}</button>
       <Audio player={player} onFileInput={onFileInput} />
-      <Metadata chart={chart} audioLength={audioLength} audioEndpoint={audioEndpoint} onChange={onMetadataChange} />
-      <button class="unload" title="Unload the chart" on:click={unload}>🗑️</button>
+      <Metadata chart={chart} audioLength={audioLength} audioEndpoint={audioEndpoint} onChange={onChartDataChange} />
+      <button class="toolbar-button" title="Unload the chart" on:click={unload}>🗑️</button>
     </div>
+    {#if enableLyricsEditor}
+      <LyricsTextarea chart={chart} onChartChange={onChartDataChange} />
+    {/if}
   {:else}
     <label class="instructions" for="file-input">
       {#if loading}
@@ -444,25 +495,57 @@
     background: #fff1;
   }
 
-  .toolbar-top, .toolbar-bottom {
+  .toolbar-top, .toolbar-middle, .toolbar-bottom {
     z-index: 2;
     position: absolute;
     bottom: 30px;
     right: 0;
     display: flex;
   }
-  .toolbar-top {
-    bottom: 80px;
+  .toolbar-middle {
+    bottom: 79px;
   }
-  .toolbar-top-container {
+  .toolbar-top {
+    bottom: 147px;
+  }
+  .toolbar-container {
     padding: 0 5px;
     background: #444;
   }
-  .toolbar-top-container input {
+  .toolbar-container input {
     margin: 10px 5px;
   }
 
-  .unload, .play-pause {
+  .grid-snap {
+    cursor: help;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 0.85;
+    padding: 11px 5px 11px 11px;
+  }
+
+  .grid-snap input {
+    font-size: 0.9em;
+    width: 50px;
+  }
+
+  .lyrics-editor-enabled .toolbar-top {
+    bottom: auto;
+    top: 118px;
+  }
+  .lyrics-editor-enabled .toolbar-middle {
+    bottom: auto;
+    top: 50px;
+  }
+  .lyrics-editor-enabled .toolbar-bottom {
+    bottom: auto;
+    top: 0;
+  }
+
+  .toolbar-button {
     appearance: none;
     outline: none;
     border: 2px solid #fff3;
@@ -472,7 +555,7 @@
     font-size: 1.5em;
   }
 
-  .unload:hover, .play-pause:hover {
+  .toolbar-button:hover {
     background: #666;
   }
 </style>

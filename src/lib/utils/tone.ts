@@ -1,10 +1,7 @@
 import type { Context, Oscillator } from 'tone';
 import type { Chart } from '../types';
 
-// This allows for some margin of error for slider joining,
-// mainly because of JavaScript's funny float sum handling
-// (I hope no one's gonna be that anal about precision)
-export const JOIN_ERROR_MARGIN = 0.000001;
+import { FLOAT_ERROR_MARGIN } from './misc';
 
 // Playing around with https://tonejs.github.io/examples/oscillator
 // (expliciting typing to make typescript happy idk)
@@ -66,13 +63,13 @@ export const scheduleToots = (toot: Oscillator, toneContext: Context, chart: Cha
         // Don't start the note if the previous note is joined to the current note
         if (
           !previousNote ||
-          previousNote[0] + previousNote[1] + JOIN_ERROR_MARGIN < position
+          previousNote[0] + previousNote[1] + FLOAT_ERROR_MARGIN < position
         ) {
           toot.start(scheduledTime);
         }
         // Don't stop the note if the next note is joined to the current note
         // Also add a bit of length because lookAhead=0 seems to shorten notes a fair amount
-        if (!nextNote || position + length + JOIN_ERROR_MARGIN < nextNote[0]) {
+        if (!nextNote || position + length + FLOAT_ERROR_MARGIN < nextNote[0]) {
           toot.stop(scheduledTime + lengthSeconds + 0.03);
         }
       }, `${positionToTicks(position)}i`);
