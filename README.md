@@ -11,17 +11,16 @@ Don't question my naming sense, this is a WIP Trombone Champ chart previewer
 * `savednotespacing` and tempo fidelity in regards to the game, (un)zooming ability
 * Playback rates from 25% to 200%
 * Audio waveform preview for sync checks
+* Lyrics and metadata editing
 
 ## TODO
 
-* Lyrics editing
-* .tmb re-export
 * Metronome
-* Change grid snap
 * Importing assets from remote URLs and handling hotlinks
 * Possibly handle MIDI parsing (there are other tools for that)
 * Tempo editing (multi-tempo support/"polyfill"?)
 * Try to make this somewhat usable on mobile (lol)
+* Some basic note editing features/macros? (e.g. move selection horizontally)
 * Some other stuff I'll think about eventually
 
 ## Development quickstart
@@ -56,3 +55,6 @@ I don't know man
 * Use [Rubber Band library](https://breakfastquay.com/rubberband/why.html) [[rubberband-web (wasm)](https://github.com/delude88/rubberband-web)]
   for better quality playback rate (they have a fast algorithm)
 * Import/export lyrics from Clone Hero charts (lol)
+* One could try to generate a difficulty map of the chart (render in the seeker?) using
+  [TootTally](https://github.com/clydejallorina/TromboneChampDiffCalc/blob/master/TMBToDiff.py)
+  algorithm

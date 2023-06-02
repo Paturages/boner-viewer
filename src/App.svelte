@@ -366,6 +366,10 @@
           title="Double click to place a lyric event
 Click an existing event to edit it
 Middle click to delete an event
+
+Tab/Shift+Tab to cycle to the next/previous event
+Escape to cancel edit
+
 You can edit the lyrics textarea to edit events:
 the lyrics will be spread according to | separators"
         ><input type="checkbox" bind:checked={enableLyricsEditor} /> Enable lyrics editor</label>

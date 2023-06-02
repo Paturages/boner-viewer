@@ -92,6 +92,8 @@
   const onLyricChange = ($event: Event, newSelectedLyric: Lyric = null) => {
     $event.preventDefault();
     if (!lyricElement.value) {
+      // Emptying a lyric's text is equivalent to deleting it
+      onChartChange({ ...chart, lyrics: chart.lyrics.filter(lyric => lyric.bar !== selectedLyric.bar) }, 'lyrics');
       selectedLyric = newSelectedLyric;
       return;
     }
@@ -102,7 +104,7 @@
         newLyrics.push({ ...lyric, text: lyricElement.value });
         isLyricInserted = true;
       } else if (!isLyricInserted && lyric.bar > selectedLyric.bar) {
-        newLyrics.push({ ...selectedLyric, text: lyricElement.value });
+        newLyrics.push({ bar: Number(selectedLyric.bar.toFixed(6)), text: lyricElement.value });
         newLyrics.push(lyric);
         isLyricInserted = true;
       } else {
@@ -110,7 +112,7 @@
       }
     });
     if (!isLyricInserted) {
-      newLyrics.push({ ...selectedLyric, text: lyricElement.value });
+      newLyrics.push({ bar: Number(selectedLyric.bar.toFixed(6)), text: lyricElement.value });
     }
     selectedLyric = newSelectedLyric;
     onChartChange({ ...chart, lyrics: newLyrics }, 'lyrics');
@@ -177,9 +179,11 @@
   />
   <!--
     Loop 1: Paint the backing white paths for the note outlines
+    2023-06-02 on joining notes: if position+length doesn't match the next position (e.g. 125.001+0.25 vs 125.25),
+    the notes will be disjointed, so the note joining conditionals have to be written in a specific way...
   -->
   {#each chart.notes as [position, length, pitchStart, pitchDelta, pitchEnd], i}
-    {#if !chart.notes[i+1] || (position + length + FLOAT_ERROR_MARGIN) < chart.notes[i+1][0]}
+    {#if !chart.notes[i+1] || (position + length - chart.notes[i+1][0] < FLOAT_ERROR_MARGIN)}
       <line
         class="note-outline"
         x1={getX(position + length, noteSpacing) - 3}
@@ -210,7 +214,7 @@
       class="note"
       on:mousedown={() => onNoteMousedown(pitchStart, pitchEnd, length)}
       fill="none"
-      marker-start={chart.notes[i-1] && (chart.notes[i-1][0] + chart.notes[i-1][1] + FLOAT_ERROR_MARGIN) >= position ? 'url(#note-mid)' : 'url(#note-start)'}
+      marker-start={chart.notes[i-1] && Math.abs(chart.notes[i-1][0] + chart.notes[i-1][1] - position) < FLOAT_ERROR_MARGIN ? 'url(#note-mid)' : 'url(#note-start)'}
       stroke="#5566aa"
       stroke-width={20}
       stroke-linecap="round"
